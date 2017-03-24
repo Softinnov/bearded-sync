@@ -1,0 +1,2 @@
+# bearded-sync
+Synchronize tickets
