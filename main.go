@@ -30,7 +30,7 @@ func main() {
 		log.Fatal(err.Error())
 	}
 	// init db
-	db, err := initdb("admin:admin@(" + *dbip + ":" + *dbport + ")/prod")
+	db, err := initdb("admin:admin@(" + *dbip + ":" + *dbport + ")/prod?parseTime=true&multiStatements=true")
 	if err != nil {
 		log.Fatal(err.Error())
 	}

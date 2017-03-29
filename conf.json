@@ -1,5 +1,5 @@
 {
     "Address": "0.0.0.0",
     "Port": "3306",
-    "Tickets": "/tmp/tickets"
+    "Tickets": "tickets"
 }
