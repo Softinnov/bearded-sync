@@ -45,11 +45,16 @@ func main() {
 		}
 		for _, entry := range entries {
 			name := entry.Name()
+
+			log.Println(name)
+
 			if !entry.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".sql") {
 
 				s := filepath.Join(*tickets, name)
 				tmp, err := ioutil.ReadFile(s)
 				sql := string(tmp)
+
+				log.Println("sql = " + sql)
 
 				transaction, err := db.Begin()
 				if err != nil {
@@ -69,7 +74,10 @@ func main() {
 					break
 				}
 
-				renamefileOK(*tickets, name)
+				err = renamefileOK(*tickets, name)
+				if err != nil {
+					log.Printf("Can't rename the file, got : %v", err.Error())
+				}
 			}
 		}
 
