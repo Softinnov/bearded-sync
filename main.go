@@ -9,22 +9,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var (
-	dbip    = flag.String("db", "db", "database ip")
-	dbport  = flag.String("port", "3306", "database port")
-	tickets = flag.String("tickets", "/tickets", "tickets folder")
-	conf    = flag.String("conf", "", "config file")
-	err     error
-)
-
 func main() {
 	// init vars
+	var (
+		dbip    = flag.String("db", "db", "database ip")
+		dbport  = flag.String("port", "3306", "database port")
+		tickets = flag.String("tickets", "/tickets", "tickets folder")
+		conf    = flag.String("conf", "", "config file")
+		err     error
+	)
 	dbip, dbport, tickets, err = initvars(conf, dbip, dbport, tickets)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -36,62 +34,60 @@ func main() {
 	}
 	defer db.Close()
 
+	// main loop
 	for {
-
-		// on va lire le dosser des tickets
-		entries, err := ioutil.ReadDir(*tickets)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		for _, entry := range entries {
-			name := entry.Name()
-
-			log.Println(name)
-
-			if !entry.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".sql") {
-
-				s := filepath.Join(*tickets, name)
-				tmp, err := ioutil.ReadFile(s)
-				sql := string(tmp)
-
-				log.Println("sql = " + sql)
-
-				transaction, err := db.Begin()
-				if err != nil {
-					log.Printf("Can't begin transaction, got : %v", err.Error())
-					break
-				}
-				_, err = transaction.Exec(sql)
-				if err != nil {
-					transaction.Rollback()
-					renamefileKO(*tickets, name)
-					log.Printf("Can't execute sql file %v, got : %v", s, err.Error())
-					break
-				}
-				err = transaction.Commit()
-				if err != nil {
-					log.Printf("Can't commit transaction, got : %v", err.Error())
-					break
-				}
-
-				err = renamefileOK(*tickets, name)
-				if err != nil {
-					log.Printf("Can't rename the file, got : %v", err.Error())
-				}
-			}
-		}
-
-		// on fait un peu dodo et on recommence
+		manage(tickets, db)
 		time.Sleep(time.Second * 5)
 	}
 
 }
 
-// renamefileOK renomme le fichier pour qu'il ne soit plus retraité
-func renamefileOK(folder, file string) error {
-	s := filepath.Join(folder, file)
-	d := filepath.Join(folder, "."+file)
-	return os.Rename(s, d)
+func manage(tickets *string, db *sql.DB) {
+	// on va lire le dosser des tickets
+	entries, err := ioutil.ReadDir(*tickets)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".sql") {
+
+			s := filepath.Join(*tickets, name)
+			tmp, err := ioutil.ReadFile(s)
+			sql := string(tmp)
+			transaction, err := db.Begin()
+			if err != nil {
+				log.Printf("Can't begin transaction, got : %v", err.Error())
+				break
+			}
+			_, err = transaction.Exec(sql)
+			if err != nil {
+				transaction.Rollback()
+				log.Printf("Can't execute sql file %v, got : %v", s, err.Error())
+
+				err = renamefileKO(*tickets, name)
+				if err != nil {
+					log.Fatalf("Can't rename the file %v while rollbacking, got : %v", name, err.Error())
+				}
+
+				break
+			}
+			err = transaction.Commit()
+			if err != nil {
+				log.Printf("Can't commit transaction, got : %v", err.Error())
+				break
+			}
+			err = deletefileOK(*tickets, name)
+			if err != nil {
+				log.Fatalf("Can't delete the file %v, got : %v", name, err.Error())
+			}
+		}
+	}
+}
+
+// deletefileOK supprime le fichier pour qu'il ne soit plus retraité
+func deletefileOK(folder, file string) error {
+	return os.Remove(filepath.Join(folder, file))
 }
 
 // renamefileKO renomme le fichier pour qu'il ne soit plus retraité mais flagué en erreur
