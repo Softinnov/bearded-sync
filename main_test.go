@@ -59,7 +59,9 @@ func TestLoop(t *testing.T) {
 	}
 	defer db.Close()
 
-	mock.ExpectExec("INSERT INTO vente (id, prod) values(1, 123)").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT INTO vente \(id, prod\) values\(1, 123\);`).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
 	// create temporary directory
 	tickets, err := ioutil.TempDir("", "tic")
@@ -69,18 +71,11 @@ func TestLoop(t *testing.T) {
 	defer os.RemoveAll(tickets)
 
 	// create fake sql file
-	sqlfake := []byte("insert into vente (id, prod) values(1, 123);")
-	sqlfile, err := ioutil.TempFile(tickets, "ticket")
-	if err != nil {
-		t.Fatalf("error was not expected while creating fake sql: %s", err)
-	}
-	_, err = sqlfile.Write(sqlfake)
+	sqlfake := []byte("INSERT INTO vente (id, prod) values(1, 123);")
+	sqlfile := tickets + "/tic.sql"
+	err = ioutil.WriteFile(sqlfile, sqlfake, 0777)
 	if err != nil {
 		t.Fatalf("error was not expected while writing fake content to sql file: %s", err)
-	}
-	err = sqlfile.Close()
-	if err != nil {
-		t.Fatalf("error was not expected while closing fake sql: %s", err)
 	}
 
 	// now we execute our method
